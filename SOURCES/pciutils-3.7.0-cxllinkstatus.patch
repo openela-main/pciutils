@@ -1,0 +1,146 @@
+diff -up pciutils-3.7.0/lib/pci.h.cxxsup pciutils-3.7.0/lib/pci.h
+--- pciutils-3.7.0/lib/pci.h.cxxsup	2024-11-02 17:31:00.588568039 +0100
++++ pciutils-3.7.0/lib/pci.h	2024-11-02 17:31:21.090755810 +0100
+@@ -142,6 +142,9 @@ struct pci_dev {
+   pciaddr_t flags[6];			/* PCI_IORESOURCE_* flags for regions */
+   pciaddr_t rom_flags;			/* PCI_IORESOURCE_* flags for expansion ROM */
+   int domain;				/* PCI domain (host bridge) */
++  u32 rcd_link_cap;     /* Link Capabilities register for RCD */
++  u16 rcd_link_status;  /* Link Status register for RCD */
++  u16 rcd_link_ctrl;    /* Link Control register for RCD */
+ 
+   /* Fields used internally */
+   struct pci_access *access;
+@@ -206,6 +209,7 @@ char *pci_get_string_property(struct pci
+ #define PCI_FILL_DT_NODE	0x2000		/* Device tree node */
+ #define PCI_FILL_IOMMU_GROUP	0x4000
+ #define PCI_FILL_RESCAN		0x00010000
++#define PCI_FILL_RCD_LNK	0x00200000      /* CXL RCD Link status properties */
+ 
+ void pci_setup_cache(struct pci_dev *, u8 *cache, int len) PCI_ABI;
+ 
+diff -up pciutils-3.7.0/lib/sysfs.c.cxxsup pciutils-3.7.0/lib/sysfs.c
+--- pciutils-3.7.0/lib/sysfs.c.cxxsup	2024-11-02 17:31:00.588568039 +0100
++++ pciutils-3.7.0/lib/sysfs.c	2024-11-02 17:31:15.374703459 +0100
+@@ -376,6 +376,18 @@ sysfs_fill_info(struct pci_dev *d, unsig
+       done |= PCI_FILL_DT_NODE;
+     }
+ 
++  if (flags & PCI_FILL_RCD_LNK)
++    {
++      char buf[OBJBUFSIZE];
++      if (sysfs_get_string(d, "rcd_link_cap", buf, 0))
++        d->rcd_link_cap = strtoul(buf, NULL, 16);
++      if (sysfs_get_string(d, "rcd_link_ctrl", buf, 0))
++        d->rcd_link_ctrl = strtoul(buf, NULL, 16);
++      if (sysfs_get_string(d, "rcd_link_status", buf, 0))
++        d->rcd_link_status = strtoul(buf, NULL, 16);
++      done |= PCI_FILL_RCD_LNK;
++    }
++
+   return done | pci_generic_fill_info(d, flags & ~done);
+ }
+ 
+diff -up pciutils-3.7.0/ls-caps.c.cxxsup pciutils-3.7.0/ls-caps.c
+--- pciutils-3.7.0/ls-caps.c.cxxsup	2024-11-02 17:31:00.587568030 +0100
++++ pciutils-3.7.0/ls-caps.c	2024-11-02 17:31:00.589568049 +0100
+@@ -8,6 +8,7 @@
+ 
+ #include <stdio.h>
+ #include <string.h>
++#include <stdlib.h>
+ 
+ #include "lspci.h"
+ 
+@@ -1336,6 +1337,68 @@ static void cap_express_slot2(struct dev
+   /* No capabilities that require this field in PCIe rev2.0 spec. */
+ }
+ 
++static void cap_express_link_rcd(struct device *d)
++{
++  u32 t, aspm, cap_speed, cap_width, sta_speed, sta_width;
++  u16 w;
++  struct pci_dev *pdev = d->dev;
++
++  if (!pdev->rcd_link_cap)
++    return;
++  t = pdev->rcd_link_cap;
++  aspm = (t & PCI_EXP_LNKCAP_ASPM) >> 10;
++  cap_speed = t & PCI_EXP_LNKCAP_SPEED;
++  cap_width = (t & PCI_EXP_LNKCAP_WIDTH) >> 4;
++  printf("\t\tLnkCap:\tPort #%d, Speed %s, Width x%d, ASPM %s",
++   t >> 24,
++   link_speed(cap_speed), cap_width,
++   aspm_support(aspm));
++  if (aspm) {
++      printf(", Exit Latency ");
++      if (aspm & 1)
++        printf("L0s %s", latency_l0s((t & PCI_EXP_LNKCAP_L0S) >> 12));
++      if (aspm & 2)
++        printf("%sL1 %s", (aspm & 1) ? ", " : "",
++      latency_l1((t & PCI_EXP_LNKCAP_L1) >> 15));
++  }
++  printf("\n");
++  printf("\t\t\tClockPM%c Surprise%c LLActRep%c BwNot%c ASPMOptComp%c\n",
++   FLAG(t, PCI_EXP_LNKCAP_CLOCKPM),
++   FLAG(t, PCI_EXP_LNKCAP_SURPRISE),
++   FLAG(t, PCI_EXP_LNKCAP_DLLA),
++   FLAG(t, PCI_EXP_LNKCAP_LBNC),
++   FLAG(t, PCI_EXP_LNKCAP_AOC));
++
++  w = pdev->rcd_link_ctrl;
++  printf("\t\tLnkCtl:\tASPM %s;", aspm_enabled(w & PCI_EXP_LNKCTL_ASPM));
++  printf(" Disabled%c CommClk%c\n\t\t\tExtSynch%c ClockPM%c AutWidDis%c BWInt%c AutBWInt%c\n",
++   FLAG(w, PCI_EXP_LNKCTL_DISABLE),
++   FLAG(w, PCI_EXP_LNKCTL_CLOCK),
++   FLAG(w, PCI_EXP_LNKCTL_XSYNCH),
++   FLAG(w, PCI_EXP_LNKCTL_CLOCKPM),
++   FLAG(w, PCI_EXP_LNKCTL_HWAUTWD),
++   FLAG(w, PCI_EXP_LNKCTL_BWMIE),
++   FLAG(w, PCI_EXP_LNKCTL_AUTBWIE));
++
++  w = pdev->rcd_link_status;
++  sta_speed = w & PCI_EXP_LNKSTA_SPEED;
++  sta_width = (w & PCI_EXP_LNKSTA_WIDTH) >> 4;
++  printf("\t\tLnkSta:\tSpeed %s%s, Width x%d%s\n",
++   link_speed(sta_speed),
++   link_compare(sta_speed, cap_speed),
++   sta_width,
++   link_compare(sta_width, cap_width));
++  printf("\t\t\tTrErr%c Train%c SlotClk%c DLActive%c BWMgmt%c ABWMgmt%c\n",
++   FLAG(w, PCI_EXP_LNKSTA_TR_ERR),
++   FLAG(w, PCI_EXP_LNKSTA_TRAIN),
++   FLAG(w, PCI_EXP_LNKSTA_SL_CLK),
++   FLAG(w, PCI_EXP_LNKSTA_DL_ACT),
++   FLAG(w, PCI_EXP_LNKSTA_BWMGMT),
++   FLAG(w, PCI_EXP_LNKSTA_AUTBW));
++
++  return;
++}
++
+ static int
+ cap_express(struct device *d, int where, int cap)
+ {
+@@ -1400,6 +1463,9 @@ cap_express(struct device *d, int where,
+   cap_express_dev(d, where, type);
+   if (link)
+     cap_express_link(d, where, type);
++  else if (d->dev->rcd_link_cap)
++    cap_express_link_rcd(d);
++   
+   if (slot)
+     cap_express_slot(d, where);
+   if (type == PCI_EXP_TYPE_ROOT_PORT || type == PCI_EXP_TYPE_ROOT_EC)
+diff -up pciutils-3.7.0/lspci.c.cxxsup pciutils-3.7.0/lspci.c
+--- pciutils-3.7.0/lspci.c.cxxsup	2024-11-02 17:31:00.589568049 +0100
++++ pciutils-3.7.0/lspci.c	2024-11-02 17:31:25.268794076 +0100
+@@ -730,7 +730,8 @@ show_verbose(struct device *d)
+   show_terse(d);
+ 
+   pci_fill_info(p, PCI_FILL_IRQ | PCI_FILL_BASES | PCI_FILL_ROM_BASE | PCI_FILL_SIZES |
+-    PCI_FILL_PHYS_SLOT | PCI_FILL_NUMA_NODE | PCI_FILL_DT_NODE | PCI_FILL_IOMMU_GROUP);
++    PCI_FILL_PHYS_SLOT | PCI_FILL_NUMA_NODE | PCI_FILL_DT_NODE | PCI_FILL_IOMMU_GROUP |
++    PCI_FILL_RCD_LNK);
+   irq = p->irq;
+ 
+   switch (htype)

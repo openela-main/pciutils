@@ -1,6 +1,6 @@
 Name:		pciutils
 Version:	3.7.0
-Release:	5%{?dist}.1
+Release:	7%{?dist}
 Summary:	PCI bus related utilities
 License:	GPLv2+
 URL:		https://mj.ucw.cz/sw/pciutils/
@@ -15,11 +15,14 @@ Patch1:		pciutils-2.2.1-idpath.patch
 Patch2:		pciutils-dir-d.patch
 Patch3: 	pciutils-3.7.0-decodercec.patch
 
-# pcie6 data rate support, from upstream, for <= 3.11, #RHEL-74316
+# pcie6 data rate support, from upstream, for <= 3.11, #RHEL-61959
 # https://github.com/pciutils/pciutils/commit/5bdf63b6b1bc35b59c4b3f47f7ca83ca1868155b
 # https://github.com/pciutils/pciutils/commit/90d270fa720862ee357735b494a0b58643a27061
 Patch4:		pciutils-3.7.0-pcie6datarate1of2.patch
 Patch5:		pciutils-3.7.0-pcie6datarate2of2.patch
+
+#cxl1.1 device link status, from upstream, for < 3.13, #RHEL-29162
+Patch6:		pciutils-3.7.0-cxllinkstatus.patch
 
 Requires:	hwdata
 Requires:	%{name}-libs = %{version}-%{release}
@@ -54,7 +57,13 @@ This package contains a static library for inspecting and setting
 devices connected to the PCI bus.
 
 %prep
-%autosetup -p1
+%autosetup -p1 -N
+%patch -P 1 -p 1
+%patch -P 2 -p 1
+%patch -P 3 -p 1
+%patch -P 4 -p 1
+%patch -P 5 -p 1
+%patch -P 6 -p 1 -b .cxxsup
 
 %build
 %make_build SHARED="no" ZLIB="no" LIBKMOD=yes STRIP="" OPT="$RPM_OPT_FLAGS" LDFLAGS="$RPM_LD_FLAGS" PREFIX="/usr" LIBDIR="%{_libdir}" IDSDIR="/usr/share/hwdata" PCI_IDS="pci.ids"
@@ -106,8 +115,11 @@ install -p -m 644 lib/libpci.pc $RPM_BUILD_ROOT%{_libdir}/pkgconfig
 %{_mandir}/man7/*
 
 %changelog
-* Wed Jan 22 2025 Michal Hlavinka <mhlavink@redhat.com> - 3.7.0-5.1
-- add PCIe 6.0 data rate (64 GT/s) support (#RHEL-74316)
+* Sat Nov 02 2024 Michal Hlavinka <mhlavink@redhat.com> - 3.7.0-7
+- add support for cxl1.1 device link status information (#RHEL-29162)
+
+* Thu Oct 31 2024 Michal Hlavinka <mhlavink@redhat.com> - 3.7.0-6
+- add PCIe 6.0 data rate (64 GT/s) support (#RHEL-61959)
 
 * Mon Aug 09 2021 Mohan Boddu <mboddu@redhat.com> - 3.7.0-5
 - Rebuilt for IMA sigs, glibc 2.34, aarch64 flags
