@@ -1,0 +1,21 @@
+From 41e0a7174c09666cf9d3c52c25caa4bb6feaaa75 Mon Sep 17 00:00:00 2001
+From: Martin Mares <mj@ucw.cz>
+Date: Fri, 5 Jul 2024 20:06:25 +0200
+Subject: [PATCH] ECAM: Fix memory leak
+
+---
+ lib/ecam.c | 1 +
+ 1 file changed, 1 insertion(+)
+
+diff --git a/lib/ecam.c b/lib/ecam.c
+index b9f8cb6..edb2494 100644
+--- a/lib/ecam.c
++++ b/lib/ecam.c
+@@ -504,6 +504,7 @@ find_mcfg(struct pci_access *a, const char *acpimcfg, const char *efisystab, int
+                       fclose(mcfg_file);
+                       return mcfg;
+                     }
++                  pci_mfree(mcfg);
+                 }
+               fclose(mcfg_file);
+             }
