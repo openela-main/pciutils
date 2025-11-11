@@ -1,6 +1,6 @@
 Name:		pciutils
 Version:	3.13.0
-Release:	5%{?dist}
+Release:	6%{?dist}
 Summary:	PCI bus related utilities
 License:	GPL-2.0-or-later
 URL:		https://mj.ucw.cz/sw/pciutils/
@@ -63,9 +63,9 @@ make clean
 %install
 install -d $RPM_BUILD_ROOT{%{_bindir},%{_sbindir},%{_mandir}/man{7,8},%{_libdir},%{_libdir}/pkgconfig,%{_includedir}/pci}
 
-install -p lspci setpci update-pciids $RPM_BUILD_ROOT%{_sbindir}
+install -p lspci setpci pcilmr update-pciids $RPM_BUILD_ROOT%{_sbindir}
 ln -sr $RPM_BUILD_ROOT%{_sbindir}/lspci $RPM_BUILD_ROOT%{_bindir}/lspci
-install -p -m 644 lspci.8 setpci.8 update-pciids.8 $RPM_BUILD_ROOT%{_mandir}/man8
+install -p -m 644 lspci.8 pcilmr.8 setpci.8 update-pciids.8 $RPM_BUILD_ROOT%{_mandir}/man8
 install -p -m 644 pcilib.7 $RPM_BUILD_ROOT%{_mandir}/man7
 install -p lib/libpci.so.* $RPM_BUILD_ROOT%{_libdir}/
 ln -s $(basename $RPM_BUILD_ROOT%{_libdir}/*.so.*.*.*) $RPM_BUILD_ROOT%{_libdir}/libpci.so
@@ -89,6 +89,7 @@ diff -u %{SOURCE2} libpci_symbols_new.lst
 %doc README ChangeLog pciutils.lsm
 %{_bindir}/lspci
 %{_sbindir}/lspci
+%{_sbindir}/pcilmr
 %{_sbindir}/setpci
 %{_sbindir}/update-pciids
 %{_mandir}/man8/*
@@ -107,6 +108,9 @@ diff -u %{SOURCE2} libpci_symbols_new.lst
 %{_mandir}/man7/*
 
 %changelog
+* Tue Jun 17 2025 Michal Hlavinka <mhlavink@redhat.com> - 3.13.0-6
+- add pcilmr which allows margin PCIe Links (RHEL-95483)
+
 * Tue Oct 29 2024 Troy Dawson <tdawson@redhat.com> - 3.13.0-5
 - Bump release for October 2024 mass rebuild:
   Resolves: RHEL-64018
