@@ -104,9 +104,9 @@ diff -up pciutils-3.7.0/ls-caps.c.cxxsup pciutils-3.7.0/ls-caps.c
 +  sta_width = (w & PCI_EXP_LNKSTA_WIDTH) >> 4;
 +  printf("\t\tLnkSta:\tSpeed %s%s, Width x%d%s\n",
 +   link_speed(sta_speed),
-+   link_compare(sta_speed, cap_speed),
++   link_compare(PCI_EXP_TYPE_ROOT_INT_EP, sta_speed, cap_speed),
 +   sta_width,
-+   link_compare(sta_width, cap_width));
++   link_compare(PCI_EXP_TYPE_ROOT_INT_EP, sta_width, cap_width));
 +  printf("\t\t\tTrErr%c Train%c SlotClk%c DLActive%c BWMgmt%c ABWMgmt%c\n",
 +   FLAG(w, PCI_EXP_LNKSTA_TR_ERR),
 +   FLAG(w, PCI_EXP_LNKSTA_TRAIN),

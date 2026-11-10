@@ -1,6 +1,6 @@
 Name:		pciutils
 Version:	3.7.0
-Release:	7%{?dist}
+Release:	8%{?dist}
 Summary:	PCI bus related utilities
 License:	GPLv2+
 URL:		https://mj.ucw.cz/sw/pciutils/
@@ -21,8 +21,12 @@ Patch3: 	pciutils-3.7.0-decodercec.patch
 Patch4:		pciutils-3.7.0-pcie6datarate1of2.patch
 Patch5:		pciutils-3.7.0-pcie6datarate2of2.patch
 
+# for < 3.8.0, RHEL-176385
+# https://github.com/pciutils/pciutils/commit/9f7681202fcfaefd02e202eb64c01eb9e962729d
+Patch6:	pciutils-3.7-speed-reporting.patch
+
 #cxl1.1 device link status, from upstream, for < 3.13, #RHEL-29162
-Patch6:		pciutils-3.7.0-cxllinkstatus.patch
+Patch7:		pciutils-3.7.0-cxllinkstatus.patch
 
 Requires:	hwdata
 Requires:	%{name}-libs = %{version}-%{release}
@@ -63,7 +67,8 @@ devices connected to the PCI bus.
 %patch -P 3 -p 1
 %patch -P 4 -p 1
 %patch -P 5 -p 1
-%patch -P 6 -p 1 -b .cxxsup
+%patch -P 6 -p 1 -b .speed-reporting
+%patch -P 7 -p 1 -b .cxxsup
 
 %build
 %make_build SHARED="no" ZLIB="no" LIBKMOD=yes STRIP="" OPT="$RPM_OPT_FLAGS" LDFLAGS="$RPM_LD_FLAGS" PREFIX="/usr" LIBDIR="%{_libdir}" IDSDIR="/usr/share/hwdata" PCI_IDS="pci.ids"
@@ -115,6 +120,9 @@ install -p -m 644 lib/libpci.pc $RPM_BUILD_ROOT%{_libdir}/pkgconfig
 %{_mandir}/man7/*
 
 %changelog
+* Mon Jun 01 2026 Michal Hlavinka <mhlavink@redhat.com> - 3.7.0-8
+- improvements to PCIe link speed downgrade reporting (RHEL-176385)
+
 * Sat Nov 02 2024 Michal Hlavinka <mhlavink@redhat.com> - 3.7.0-7
 - add support for cxl1.1 device link status information (#RHEL-29162)
 
